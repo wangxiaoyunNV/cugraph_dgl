@@ -57,9 +57,16 @@ def cugraphSampler(g, nodes, fanouts, edge_dir='in', prob=None, replace=False,
             pos0 = seeds_offsets[i-1]
             pos1 = seeds_offsets[i]
             edge_list = ego_edge_list[pos0:pos1]
-        
-            filtered_list = edge_list[edge_list ['dst']== current_seeds[i-1]][:fanout]
-            #print ('len filtered_list',len(filtered_list))
+            # get randomness fanout
+            filtered_list = edge_list[edge_list ['dst']== current_seeds[i-1]]
+             
+            # get sampled_list
+            if len(filtered_list) > fanout:
+                sampled_indices = random.sample(filtered_list.index.to_arrow().to_pylist(), fanout)
+                filtered_list = filtered_list.reindex(index = sampled_indices)
+                
+
+
             children = cupy.asarray(filtered_list['src'])
             parents = cupy.asarray(filtered_list['dst'])
             # copy the src and dst to cupy array
