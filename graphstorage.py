@@ -6,14 +6,14 @@ import cugraph
 class GraphStorage(object):
     # the input g here is the cugraph graphs? whats ndata and edata?
     def __init__(self, g, ndata = None, edata = None):
-        # build cugraph graphstorage here
         # g is the cugraph property graph
         self.graphstore =  cugraph.gnn.CuGraphStore(graph = g)
+        self.edata = g.edata
+        self.ndata = g.ndata
 
 
     def get_node_storage(self, key, ntype=None):
         if ntype is None:
-            # need to change here. What is the ntypes[0] ?
             ntype = self.g.ntypes[0]
         return self._ndata[key][ntype]
         
@@ -75,8 +75,12 @@ class GraphStorage(object):
             A sampled subgraph with the same nodes as the original graph, but only the sampled neighboring
             edges.  The induced edge IDs will be in ``edata[dgl.EID]``.
         """
-        sampled_graph = cugraph_sampler.cugraphSampler()
-        # sampled_graph = self.graphstore.cugraphSampler()
+        #sampled_graph = cugraph_sampler.cugraphSampler(XXXXX, )
+        # return type is cupy array
+        parents_nodes, children_nodes = self.graphstore.sample_neighbors(seed_nodes, fanout, edge_dir='in', prob=None, replace=False)
+        # construct dgl graph, want to double check if children and parents are in the correct order
+        sampled_graph = dgl.graph ((children_nodes,parents_nodes))
+        # to device function move the dgl graph to desired devices
         sampled_graph.to_device (output_device)
         return sampled_graph
 
@@ -106,7 +110,9 @@ class GraphStorage(object):
         DGLGraph
             The subgraph.
         """
-        sampled_graph = self.graphstore.subgraph(nodes)
+        sampled_cugraph = self.graphstore.node_subgraph(nodes)
+        # the return type is cugraph subgraph
+        sample_graph = toDGL(sampled_cugraph)
         sampled_graph.to_device (output_device)
         return sampled_graph
 
@@ -139,6 +145,8 @@ class GraphStorage(object):
         """
         pass
 
+
+# no need to implement the 3 functions below
     # Required in Link Prediction negative sampler
     def find_edges(self, edges, etype=None, output_device=None):
         """Return the source and destination node IDs given the edge IDs within the given edge type.
@@ -148,7 +156,7 @@ class GraphStorage(object):
     # Required in Link Prediction negative sampler
     def num_nodes(self, ntype):
         """Return the number of nodes for the given node type."""
-        pass
+        # use graphstore function
 
     def global_uniform_negative_sampling(self, num_samples, exclude_self_loops=True,
                                          replace=False, etype=None):
