@@ -45,13 +45,18 @@ def load_subtensor(nfeat, labels, seeds, input_nodes, device):
 #### Entry point
 def run(args, device, data):
     # Unpack data
+    # the reading data part need to be changed
     n_classes, train_g, val_g, test_g, train_nfeat, train_labels, \
     val_nfeat, val_labels, test_nfeat, test_labels = data
     in_feats = train_nfeat.shape[1]
     train_nid = th.nonzero(train_g.ndata['train_mask'], as_tuple=True)[0]
     val_nid = th.nonzero(val_g.ndata['val_mask'], as_tuple=True)[0]
     test_nid = th.nonzero(~(test_g.ndata['train_mask'] | test_g.ndata['val_mask']), as_tuple=True)[0]
+    
+    print ("train_g", train_g)
+    print ("val_g", val_g)
 
+    # need to change to gpu 
     dataloader_device = th.device('cpu')
     if args.sample_gpu:
         train_nid = train_nid.to(device)
@@ -63,6 +68,9 @@ def run(args, device, data):
     # Create PyTorch DataLoader for constructing blocks
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout) for fanout in args.fan_out.split(',')])
+
+    # their new dataloader will automatically call our graphsage.
+    # no need to change this part
     dataloader = dgl.dataloading.NodeDataLoader(
         train_g,
         train_nid,

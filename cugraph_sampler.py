@@ -121,7 +121,7 @@ if __name__ == '__main__':
             blocks = cugraphSampler(G_cu, shuffled_nodes[i*batch_size: (i+1)*batch_size], [5,10]) 
 
 
-
+           
 
 
 

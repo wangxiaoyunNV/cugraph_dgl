@@ -2,38 +2,64 @@
 GraphStorage Class in DGL 
 """
 import cugraph
+import dgl
+from cugraph.experimental import PropertyGraph
+import pandas as pd
+import numpy as np
+import cudf
+import cupy
+
 
 class GraphStorage(object):
     # the input g here is the cugraph graphs? whats ndata and edata?
     def __init__(self, g, ndata = None, edata = None):
         # g is the cugraph property graph
         self.graphstore =  cugraph.gnn.CuGraphStore(graph = g)
-        self.edata = g.edata
-        self.ndata = g.ndata
+        self._edata = g.edata
+        self._ndata = g.ndata
 
+    @property
+    def ndata(self):
+        return self._ndata
+
+    @property
+    def edata(self):
+        return self._edata
 
     def get_node_storage(self, key, ntype=None):
-        if ntype is None:
-            ntype = self.g.ntypes[0]
-        return self._ndata[key][ntype]
-        
+        # ndata is dataframe, ntype = merchants, key = merchant_id
+        #(ndata[ndata['_TYPE_']== 'merchants']['merchant_id'])
+        return self._ndata [self._ndata['_TYPE_'] == ntype][key]
+        #select_vertices not correct function
 
     def get_edge_storage(self, key, etype=None):
-        if etype is None:
-            etype = self.g.etypes[0]
-        return self._edata[key][etype]
+        # edata is dataframe
+        return self._edata [self._edata['_TYPE_'] == etype][key]
+        #select_edges
 
     # Required for checking whether a single dict is allowed for ndata and edata.
-    @property
-    def ntypes(self):
-        pass
+    #@property
+    #def ntypes(self):
+    #    pass
+    # I think we always allow that?
 
     @property
-    def canonical_etypes(self):
-        pass
+    #def canonical_etypes(self):
+    #    pass
 
-    def etypes(self):
-        return [etype[1] for etype in self.canonical_etypes]
+    #def etypes(self):
+        #return [etype[1] for etype in self.canonical_etypes]
+
+    # from cugraph to DGL using 
+    def toDGL(graph):
+        # input is cugraph graph
+        # output is DGL graph
+        edgelist = graph.edges()
+        src = cupy.asarray(edgelist['src'])
+        dst = cupy.asarray(edgelist['dst'])
+        g_dgl = dgl.graph((src, dst))
+        return g_dgl
+
 
     def sample_neighbors(self, seed_nodes, fanout, edge_dir='in', prob=None,
                          exclude_edges=None, replace=False, output_device=None):
@@ -85,6 +111,7 @@ class GraphStorage(object):
         return sampled_graph
 
     # Required in Cluster-GCN
+    
     def subgraph(self, nodes, relabel_nodes=False, output_device=None):
         """Return a subgraph induced on given nodes.
         This has the same semantics as ``dgl.node_subgraph``.
@@ -118,7 +145,8 @@ class GraphStorage(object):
 
 
     # Required in Link Prediction
-    def edge_subgraph(self, edges, relabel_nodes=False, output_device=None):
+    # we don't need to implement this function as advised by DGL
+    #def edge_subgraph(self, edges, relabel_nodes=False, output_device=None):
         """Return a subgraph induced on given edges.
         This has the same semantics as ``dgl.edge_subgraph``.
         Parameters
@@ -143,7 +171,7 @@ class GraphStorage(object):
         DGLGraph
             The subgraph.
         """
-        pass
+         
 
 
 # no need to implement the 3 functions below
@@ -151,14 +179,22 @@ class GraphStorage(object):
     def find_edges(self, edges, etype=None, output_device=None):
         """Return the source and destination node IDs given the edge IDs within the given edge type.
         """
-        pass
+        # edges are a range of edge IDs, for example 0-100
+        selected_edges = self._edata[self._edata['_TYPE_'] == etype].iloc[edges]
+        src_nodes = selected_edges['_SRC_']
+        dst_nodes = selected_edges['_DST_']
+
+        return src_nodes, dst_nodes
+
 
     # Required in Link Prediction negative sampler
     def num_nodes(self, ntype):
         """Return the number of nodes for the given node type."""
         # use graphstore function
+        return self._ndata[self._ndata['_TYPE_']== ntype].shape[0]
+        
 
-    def global_uniform_negative_sampling(self, num_samples, exclude_self_loops=True,
+    #def global_uniform_negative_sampling(self, num_samples, exclude_self_loops=True,
                                          replace=False, etype=None):
         """Per source negative sampling as in ``dgl.dataloading.GlobalUniform``"""
 
