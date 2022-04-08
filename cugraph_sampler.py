@@ -39,7 +39,8 @@ def cugraphSampler(g, nodes, fanouts, edge_dir='in', prob=None, replace=False,
                      copy_ndata=True, copy_edata=True, _dist_training=False, exclude_edges=None):
     # from here get in a new for loop
     # ego_net return edge list
-    current_seeds = cudf.Series(nodes.to_array())
+    num_nodes = len(nodes)
+    current_seeds = nodes.reindex(index = np.arange(0, num_nodes))
     blocks = []
     #seeds = cudf.Series(nodes.to_array())
 
@@ -65,17 +66,12 @@ def cugraphSampler(g, nodes, fanouts, edge_dir='in', prob=None, replace=False,
                 sampled_indices = random.sample(filtered_list.index.to_arrow().to_pylist(), fanout)
                 filtered_list = filtered_list.reindex(index = sampled_indices)
                 
-
-
             children = cupy.asarray(filtered_list['src'])
             parents = cupy.asarray(filtered_list['dst'])
             # copy the src and dst to cupy array
-            #all_parents[(i-1)*fanout:i*fanout] = parents
-            #all_children[(i-1)*fanout:i*fanout] = children
             all_parents = cupy.append(all_parents, parents)
             all_children = cupy.append(all_children, children)
             #print (len(test_parents)) 
-        # end of filtering 
 
         # generate dgl.graph and  blocks
         sampled_graph = dgl.graph ((all_children,all_parents))
@@ -84,15 +80,15 @@ def cugraphSampler(g, nodes, fanouts, edge_dir='in', prob=None, replace=False,
         #print(sampled_graph.edges())
         #print(seeds.to_array())
         #eid = sampled_graph.edata[dgl.EID]
-        block =dgl.to_block(sampled_graph,current_seeds.to_array())
+        #block =dgl.to_block(sampled_graph,current_seeds.to_array())
         #block.edata[dgl.EID] = eid
-        current_seeds = block.srcdata[dgl.NID]
-        current_seeds = cudf.Series(current_seeds.cpu().detach().numpy())
+        #current_seeds = block.srcdata[dgl.NID]
+        #current_seeds = cudf.Series(current_seeds.cpu().detach().numpy())
 
-        blocks.insert(0, block)
+        #blocks.insert(0, block)
         # end of for
 
-    return blocks
+    return sampled_graph
 
 
 if __name__ == '__main__':
@@ -111,11 +107,10 @@ if __name__ == '__main__':
         shuffled_nodes = np.arange(num_nodes)
         #print(len(nodes), len(shuffled_nodes))
         np.random.shuffle(shuffled_nodes)
-        
-        #print(type(nodes))
+        print(type(nodes))
         shuffled_nodes = cudf.Series(shuffled_nodes)
-        #nodes.set_index('new_index')
-        
+        new_nodes = nodes.reindex(index = shuffled_nodes)
+         
         #print (nodes)
         for i in range(int(num_batch)-1):
             blocks = cugraphSampler(G_cu, shuffled_nodes[i*batch_size: (i+1)*batch_size], [5,10]) 
